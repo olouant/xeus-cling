@@ -56,6 +56,10 @@ namespace xcpp
             .help("linker options: enable instrumentation with ThreadSanitizer using \'-fsanitize=thread\'")
             .default_value(false)
             .implicit_value(true);
+        argpars.add_argument("-mpi")
+            .help("Link with MPI library")
+            .default_value(false)
+            .implicit_value(true);
         // Add custom help (does not call `exit` avoiding to restart the kernel)
         argpars.add_argument("-h", "--help")
             .action([&](const std::string & /*unused*/)
@@ -66,6 +70,71 @@ namespace xcpp
             .help("shows help message")
             .implicit_value(true)
             .nargs(0);
+    }
+
+    static bool get_mpi_linker_flags(std::vector<std::string>& mpi_flags)
+    {
+        std::string mpicc_path = llvm::sys::findProgramByName("mpic++").get();
+        if (mpicc_path.empty())
+        {
+            std::cerr << "mpicc not found in PATH\n";
+            return false;
+        }
+
+        llvm::StringRef args[] = {mpicc_path.c_str(), "-show"};
+
+        int fd;
+        llvm::SmallString<128> stdoutFile;
+        if (std::error_code ec = llvm::sys::fs::createTemporaryFile(
+            "mpicc-output", "txt", fd, stdoutFile))
+        {
+            std::cerr << "Could not create temp file: " << ec.message() << "\n";
+            return false;
+        }
+
+        llvm::Optional<llvm::StringRef> redirects[] =
+            {llvm::None, stdoutFile.str(), llvm::None};
+
+        int result = llvm::sys::ExecuteAndWait(mpicc_path, args,
+            /*Env=*/llvm::None, /*Redirects=*/redirects
+        );
+
+        if (result != 0)
+        {
+            std::cerr << "mpicc -show failed with code " << result << "\n";
+            return false;
+        }
+
+        auto bufferOrError = llvm::MemoryBuffer::getFile(stdoutFile);
+        if (!bufferOrError)
+        {
+            std::cerr << "Could not read temp file: "
+                << bufferOrError.getError().message() << "\n";
+            llvm::sys::fs::remove(stdoutFile);
+            return false;
+        }
+
+        std::string output = bufferOrError.get()->getBuffer().str();
+
+        llvm::sys::fs::remove(stdoutFile);
+
+        llvm::SmallVector<llvm::StringRef, 16> tokens;
+        llvm::StringRef outputRef(output);
+        outputRef.split(tokens, ' ', /*MaxSplit=*/-1, /*KeepEmpty=*/false);
+
+        if (!tokens.empty())
+        {
+            tokens.erase(tokens.begin());
+        }
+
+        for (const auto& token : tokens) {
+            llvm::StringRef trimmed = token.trim();
+            if (trimmed.empty()) continue;
+
+            mpi_flags.push_back(trimmed.str());
+        }
+
+        return true;
     }
 
     std::string executable::generate_fns(const std::string& cell,
@@ -324,6 +393,22 @@ namespace xcpp
             // line of the input caused the race.
             EnableDebugInfo = true;
             LinkerOptions.push_back("-fsanitize=thread");
+        }
+
+        bool LinkMPI = argpars.is_used("-mpi");
+        if (LinkMPI)
+        {
+            std::cout << "Linking executable with MPI library"
+                      << std::endl;
+
+            std::vector<std::string> MPILinkerFlags;
+            if (get_mpi_linker_flags(MPILinkerFlags))
+            {
+                for (std::string Flag: MPILinkerFlags)
+                {
+                    LinkerOptions.push_back(Flag);
+                }
+            }
         }
 
         std::cout << "Writing executable to " << ExeFile << std::endl;
