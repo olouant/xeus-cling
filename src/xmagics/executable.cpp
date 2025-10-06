@@ -83,14 +83,15 @@ namespace xcpp
 
         llvm::StringRef args[] = {mpicxx_path.c_str(), "-show"};
 
-        int fd;
         llvm::SmallString<128> stdoutFile;
         if (std::error_code ec = llvm::sys::fs::createTemporaryFile(
-            "mpicxx-output", "txt", fd, stdoutFile))
+            "mpicxx-output", "txt", stdoutFile))
         {
             std::cerr << "Could not create temp file: " << ec.message() << "\n";
             return false;
         }
+
+        llvm::FileRemover OutputRemover(stdoutFile.c_str());
 
         llvm::Optional<llvm::StringRef> redirects[] =
             {llvm::None, stdoutFile.str(), llvm::None};
@@ -110,13 +111,10 @@ namespace xcpp
         {
             std::cerr << "Could not read temp file: "
                 << bufferOrError.getError().message() << "\n";
-            llvm::sys::fs::remove(stdoutFile);
             return false;
         }
 
         std::string output = bufferOrError.get()->getBuffer().str();
-
-        llvm::sys::fs::remove(stdoutFile);
 
         llvm::SmallVector<llvm::StringRef, 16> tokens;
         llvm::StringRef outputRef(output);
