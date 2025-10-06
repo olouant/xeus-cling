@@ -395,6 +395,18 @@ namespace xcpp
             LinkerOptions.push_back("-fsanitize=thread");
         }
 
+        std::vector<const char*> RemainingOptions =
+                m_interpreter.getOptions().CompilerOpts.Remaining;
+
+        if (std::find_if(RemainingOptions.begin(), RemainingOptions.end(),
+            [](const char* Opt) { return std::strcmp(Opt, "-fopenmp") == 0; })
+            != RemainingOptions.end())
+        {
+            std::cout << "Passing OpenMP flag to the linker" << std::endl;
+
+            LinkerOptions.push_back("-fopenmp");
+        }
+
         bool LinkMPI = argpars.is_used("-mpi");
         if (LinkMPI)
         {
