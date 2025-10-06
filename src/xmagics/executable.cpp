@@ -74,19 +74,19 @@ namespace xcpp
 
     static bool get_mpi_linker_flags(std::vector<std::string>& mpi_flags)
     {
-        std::string mpicc_path = llvm::sys::findProgramByName("mpic++").get();
-        if (mpicc_path.empty())
+        std::string mpicxx_path = llvm::sys::findProgramByName("mpic++").get();
+        if (mpicxx_path.empty())
         {
-            std::cerr << "mpicc not found in PATH\n";
+            std::cerr << "mpic++ not found in PATH\n";
             return false;
         }
 
-        llvm::StringRef args[] = {mpicc_path.c_str(), "-show"};
+        llvm::StringRef args[] = {mpicxx_path.c_str(), "-show"};
 
         int fd;
         llvm::SmallString<128> stdoutFile;
         if (std::error_code ec = llvm::sys::fs::createTemporaryFile(
-            "mpicc-output", "txt", fd, stdoutFile))
+            "mpicxx-output", "txt", fd, stdoutFile))
         {
             std::cerr << "Could not create temp file: " << ec.message() << "\n";
             return false;
@@ -95,13 +95,13 @@ namespace xcpp
         llvm::Optional<llvm::StringRef> redirects[] =
             {llvm::None, stdoutFile.str(), llvm::None};
 
-        int result = llvm::sys::ExecuteAndWait(mpicc_path, args,
+        int result = llvm::sys::ExecuteAndWait(mpicxx_path, args,
             /*Env=*/llvm::None, /*Redirects=*/redirects
         );
 
         if (result != 0)
         {
-            std::cerr << "mpicc -show failed with code " << result << "\n";
+            std::cerr << "mpic++ -show failed with code " << result << "\n";
             return false;
         }
 
