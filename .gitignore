@@ -49,5 +49,9 @@ build/
 /share/jupyter/kernels/xcpp14/kernel.json
 /share/jupyter/kernels/xcpp17/kernel.json
 
+/share/jupyter/kernels/xcpp11-openmp/kernel.json
+/share/jupyter/kernels/xcpp14-openmp/kernel.json
+/share/jupyter/kernels/xcpp17-openmp/kernel.json
+
 # Jupyter artefacts
 .ipynb_checkpoints/
